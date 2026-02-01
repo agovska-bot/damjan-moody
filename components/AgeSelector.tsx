@@ -11,27 +11,19 @@ interface AgeSelectorProps {
   uiStrings: AgeSelectorUiStrings | null;
 }
 
-const buttonColors = [
-  'bg-happy-green-500 hover:bg-happy-green-600 focus:ring-happy-green-500',
-  'bg-sky-blue-500 hover:bg-sky-blue-600 focus:ring-sky-blue-500',
-  'bg-sunny-orange-500 hover:bg-sunny-orange-600 focus:ring-sunny-orange-500',
-  'bg-soft-pink-500 hover:bg-soft-pink-600 focus:ring-soft-pink-500',
+const buttonVariants = [
+  { bg: 'bg-lovely-purple-500', hover: 'hover:bg-lovely-purple-600', ring: 'focus:ring-lovely-purple-500' },
+  { bg: 'bg-aqua-teal-500', hover: 'hover:bg-aqua-teal-600', ring: 'focus:ring-aqua-teal-500' },
+  { bg: 'bg-sky-blue-500', hover: 'hover:bg-sky-blue-600', ring: 'focus:ring-sky-blue-500' },
+  { bg: 'bg-sunny-orange-500', hover: 'hover:bg-sunny-orange-600', ring: 'focus:ring-sunny-orange-500' },
 ];
 
 const AgeSelector: React.FC<AgeSelectorProps> = ({ onSelect, onBack, loading, loadingStrings, uiStrings }) => {
-  // Full screen loader while fetching its own strings
   if (loadingStrings || !uiStrings) {
-    return (
-      <div className="min-h-screen text-gray-800 flex flex-col items-center justify-center p-4 font-sans">
-        <div className="w-full max-w-sm bg-white p-8 rounded-2xl shadow-lg text-center">
-          <p className="text-gray-500 mb-2">Getting things ready...</p>
-          <LoadingSpinner />
-        </div>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center"><LoadingSpinner /></div>;
   }
   
-  const ageRanges = [
+  const ranges = [
     { name: uiStrings.ages['5-7'], value: '5-7' },
     { name: uiStrings.ages['8-12'], value: '8-12' },
     { name: uiStrings.ages['13-18'], value: '13-18' },
@@ -39,32 +31,19 @@ const AgeSelector: React.FC<AgeSelectorProps> = ({ onSelect, onBack, loading, lo
   ];
 
   return (
-    <div className="min-h-screen text-gray-800 flex flex-col items-center justify-center p-4 font-sans">
-      <div className="w-full max-w-sm bg-white p-8 rounded-2xl shadow-lg text-center animate-fade-in relative">
-        <button
-          onClick={onBack}
-          className="absolute top-4 left-4 px-3 py-1 text-sm font-semibold text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition-all duration-300 transform hover:-translate-x-1 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-50 disabled:transform-none"
-          aria-label="Go back to language selection"
-          disabled={loading}
-        >
-          {uiStrings.backButton}
-        </button>
-        <h1 className="text-3xl font-bold text-gray-800 mt-8">{uiStrings.title}</h1>
-        <p className="text-gray-600 mt-4 mb-6">{uiStrings.prompt}</p>
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+      <div className="w-full max-w-sm bg-white p-10 rounded-[2.5rem] card-shadow animate-fade-in-up relative">
+        <button onClick={onBack} className="absolute top-6 left-6 text-gray-400 font-bold hover:text-gray-600">←</button>
+        <h1 className="text-3xl font-black text-gray-900 mb-2 mt-4">{uiStrings.title}</h1>
+        <p className="text-gray-500 mb-8 font-medium">{uiStrings.prompt}</p>
         
-        {loading ? ( // This is for when main app is loading AFTER selection
-          <div className="mt-6">
-            <p className="text-gray-500 mb-2">{uiStrings.loading}</p>
-            <LoadingSpinner/>
-          </div>
-        ) : (
+        {loading ? <LoadingSpinner /> : (
           <div className="flex flex-col gap-4">
-            {ageRanges.map((age, index) => (
+            {ranges.map((age, i) => (
               <button
                 key={age.value}
                 onClick={() => onSelect(age.value)}
-                disabled={loading}
-                className={`w-full px-6 py-3 font-semibold text-white rounded-lg shadow-md hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-300 transform hover:scale-105 disabled:bg-gray-400 disabled:scale-100 disabled:cursor-not-allowed ${buttonColors[index % buttonColors.length]}`}
+                className={`w-full py-4 font-black text-white rounded-2xl shadow-sm transition-all transform hover:scale-105 active:scale-95 ${buttonVariants[i].bg} ${buttonVariants[i].hover} focus:ring-4 ${buttonVariants[i].ring} focus:ring-opacity-50`}
               >
                 {age.name}
               </button>
