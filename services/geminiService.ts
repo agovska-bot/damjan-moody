@@ -1,29 +1,25 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { UiStrings, AgeSelectorUiStrings } from "../types";
 
-const API_KEY = process.env.API_KEY;
+// Always initialize the Google GenAI client using a named parameter for the API key.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
-
-export const englishAgeSelectorStrings: AgeSelectorUiStrings = {
-  backButton: "← Back",
-  title: "How old are you?",
-  prompt: "This helps me make things just right for you!",
-  loading: "Getting things ready...",
-  ages: {
-    '5-7': "5-7 years old",
-    '8-12': "8-12 years old",
-    '13-18': "13-18 years old",
-    '18+': "Adult",
+// Helper function to call Gemini for text generation tasks.
+const callGemini = async (prompt: string, defaultResponse: string): Promise<string> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+    });
+    // Use the .text property directly as per latest SDK guidelines.
+    return response.text?.trim().replace(/"/g, "") || defaultResponse;
+  } catch (error) {
+    console.error("Gemini Error:", error);
+    return defaultResponse;
   }
 };
 
-const englishStrings: UiStrings = {
+export const englishStrings: UiStrings = {
   subtitles: [
     "Your friendly feelings friend!",
     "Ready for a fun adventure?",
@@ -85,134 +81,88 @@ const englishStrings: UiStrings = {
     "saveNote": "Save to Journal"
   },
   storyCreator: {
-    "error": "Oops! My storytelling magic ran out. Let's try again!",
+    "error": "Oops! My storytelling magic ran out.",
     "theEnd": "The End! 🌟",
-    "startNew": "Start a New Adventure",
-    "placeholder": "What happens next?",
-    "finish": "Finish the Story",
-    "thinking": "Thinking...",
-    "addPart": "Tell Me!"
+    "startNew": "Start New",
+    "placeholder": "What's next?",
+    "finish": "Finish",
+    "thinking": "...",
+    "addPart": "Go!"
   },
   "backButton": "Back",
-  "changeLanguageAndAge": "Change Language And Age",
+  "changeLanguageAndAge": "Change Language",
   "saveProgress": "Save Progress",
-  "progressSaved": "Progress Saved!",
-  "saveFailed": "Save Failed!"
+  "progressSaved": "Saved!",
+  "saveFailed": "Failed!"
 };
 
-export const translateAgeSelectorUI = async (targetLanguage: string): Promise<AgeSelectorUiStrings> => {
-    if (targetLanguage.toLowerCase().includes('english')) {
-        return englishAgeSelectorStrings;
-    }
-
-    const prompt = `Translate the following JSON object of UI strings for an age selection screen in a kids' app. The target language is ${targetLanguage}. Keep the JSON structure and all keys identical. Only translate the string values.
-
-${JSON.stringify(englishAgeSelectorStrings, null, 2)}
-`;
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-            }
-        });
-        const jsonStr = response.text.trim();
-        return JSON.parse(jsonStr) as AgeSelectorUiStrings;
-    } catch (error) {
-        console.error("Error translating age selector UI, falling back to English:", error);
-        return englishAgeSelectorStrings;
-    }
-};
-
+// Translates the UI strings based on language and age range.
 export const translateUI = async (targetLanguage: string, ageRange: string): Promise<UiStrings> => {
-    if (targetLanguage.toLowerCase().includes('english')) {
-        return englishStrings;
-    }
+    const prompt = `Translate this JSON into ${targetLanguage} for a ${ageRange} year old. 
+    IMPORTANT: Use a friendly "Buddy" persona. For Macedonian, use "ти" (informal). 
+    Ensure task descriptions sound native and encouraging.
+    
+    ${JSON.stringify(englishStrings)}`;
 
-    const prompt = `Translate the following JSON object of UI strings for a kids' app from English into ${targetLanguage}. The target audience is in the age range of ${ageRange} years old. Tailor the language to be appropriate for them. Keep the JSON structure and all keys identical. Only translate the string values.
-
-${JSON.stringify(englishStrings, null, 2)}
-`;
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-            }
+            config: { responseMimeType: "application/json" }
         });
-        const jsonStr = response.text.trim();
-        return JSON.parse(jsonStr) as UiStrings;
-    } catch (error) {
-        console.error("Error translating UI, falling back to English:", error);
+        return JSON.parse(response.text || '{}') as UiStrings;
+    } catch (e) {
         return englishStrings;
     }
 };
 
-const callGemini = async (prompt: string, defaultResponse: string): Promise<string> => {
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-    });
-    return response.text.trim().replace(/"/g, "");
-  } catch (error) {
-    console.error("Error calling Gemini API:", error);
-    return defaultResponse;
-  }
+// Translates UI strings for the age selection screen.
+export const translateAgeSelectorUI = async (targetLanguage: string): Promise<AgeSelectorUiStrings> => {
+    const prompt = `Translate this Age Selection UI into ${targetLanguage}.
+    {
+      "backButton": "Back",
+      "title": "How old are you?",
+      "prompt": "I will adjust the app for you!",
+      "loading": "Loading...",
+      "ages": { "5-7": "5-7", "8-12": "8-12", "13-18": "13-18", "18+": "Adult" }
+    }`;
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: { responseMimeType: "application/json" }
+        });
+        return JSON.parse(response.text || '{}') as AgeSelectorUiStrings;
+    } catch (e) {
+        return {
+          backButton: "Back", title: "How old are you?", prompt: "...", loading: "...", ages: {"5-7":"5-7", "8-12":"8-12", "13-18":"13-18", "18+":"Adult"}
+        };
+    }
 };
 
-export const generateGratitudePrompt = (language: string, ageRange: string) => callGemini(
-  `Generate a single, simple prompt in ${language} to help someone in the age range of ${ageRange} years old think about something they are grateful for. The response should be a complete question or a gentle instruction. Keep the response concise.`,
-  "What is your favorite toy and why do you love it?"
-);
+// Story creator logic: Starts a new interactive story.
+export const startStory = (lang: string, age: string) => 
+  callGemini(`As a friendly Buddy, start a fun interactive story for a ${age} year old in ${lang}. Stop at a cliffhanger and ask what happens next. Keep it under 60 words.`, "Once upon a time...");
 
-export const generateMovingActivity = (language: string, ageRange: string) => callGemini(
-  `Suggest a single, fun, simple physical activity for someone in the age range of ${ageRange} years old to do, in ${language}. It should be easy to do indoors or outdoors.`,
-  "Let's be a tree! Stand on one leg for as long as you can, then switch to the other."
-);
+// Story creator logic: Continues the story based on user input.
+export const continueStory = (storySoFar: string, lang: string, age: string) => 
+  callGemini(`As a friendly Buddy, continue this story for a ${age} year old in ${lang} based on their input. Story so far: ${storySoFar}. Keep it brief (under 60 words) and ask what happens next.`, "And then...");
 
-export const generateKindnessAct = (language: string, ageRange: string) => callGemini(
-  `Suggest a single, simple act of kindness someone in the age range of ${ageRange} years old can do today, in ${language}.`,
-  "Can you tell someone they are doing a great job today?"
-);
+// Story creator logic: Concludes the story with a happy ending.
+export const finishStory = (storySoFar: string, lang: string, age: string) => 
+  callGemini(`As a friendly Buddy, write a happy ending for this story for a ${age} year old in ${lang}. Story so far: ${storySoFar}.`, "The end.");
 
-export const generateCalmnessActivity = (language: string, ageRange: string) => callGemini(
-  `Suggest a single, simple, calming breathing exercise for someone in the age range of ${ageRange} years old who needs to relax, in ${language}. Describe the steps in a fun, imaginative way.`,
-  "Let's do some 'Snake Breaths'! Breathe in through your nose, and then breathe out with a long, slow hissing sound like a snake."
-);
+export const generateGratitudePrompt = (lang: string, age: string) => 
+  callGemini(`As a friendly Buddy, ask a ${age} year old in ${lang} what they are grateful for today. Be very brief.`, "На што си благодарен денес?");
 
-export const generateMoodResponse = (mood: string, notes: string, language: string, ageRange: string) => {
-  let prompt = `A user in the age range of ${ageRange} years old is feeling ${mood}.`;
-  if (notes) {
-    prompt += ` They wrote: "${notes}".`;
-  }
-  prompt += ` Provide a short, simple, reassuring, and positive response in 1-2 sentences, written in ${language}. Address the user directly.`;
-  
-  return callGemini(prompt, "Thanks for sharing how you feel. It's good to talk about our feelings!");
-};
+export const generateMovingActivity = (lang: string, age: string) => 
+  callGemini(`As a friendly Buddy, suggest a 1-minute physical activity for a ${age} year old in ${lang}.`, "Скокни 10 пати во место!");
 
-/**
- * Starts a new interactive story for a child.
- */
-export const startStory = (language: string, ageRange: string) => callGemini(
-  `You are a storyteller for kids. Start a fun, imaginative story for a child aged ${ageRange} in ${language}. Just provide the first 2-3 sentences. Encourage the child to decide what happens next by asking a simple question.`,
-  "Once upon a time, there was a little robot who found a mysterious blue door in the forest. What do you think was behind the door?"
-);
+export const generateKindnessAct = (lang: string, age: string) => 
+  callGemini(`As a friendly Buddy, suggest a small act of kindness for a ${age} year old in ${lang}.`, "Кажи му на некој нешто убаво!");
 
-/**
- * Continues an existing story based on user input.
- */
-export const continueStory = (storySoFar: string, language: string, ageRange: string) => callGemini(
-  `You are a storyteller for kids aged ${ageRange}. Here is the story so far:\n\n${storySoFar}\n\nContinue the story based on the latest input, in ${language}. Keep it to 2-3 sentences and ask another question to keep the child engaged.`,
-  "The robot opened the door and found a room full of floating balloons! One balloon was bigger than the others. What color was it?"
-);
+export const generateCalmnessActivity = (lang: string, age: string) => 
+  callGemini(`As a friendly Buddy, describe a simple breathing exercise for a ${age} year old in ${lang}.`, "Диши длабоко како балон...");
 
-/**
- * Provides a conclusion to the story.
- */
-export const finishStory = (storySoFar: string, language: string, ageRange: string) => callGemini(
-  `You are a storyteller for kids aged ${ageRange}. Here is the story so far:\n\n${storySoFar}\n\nProvide a happy and creative ending for the story in ${language}. Keep it to 3-4 sentences.`,
-  "And so, the robot and all the floating balloons had a big party. Everyone was happy and the robot made many new friends. The end!"
-);
+export const generateMoodResponse = (mood: string, notes: string, lang: string, age: string) => 
+  callGemini(`As a friendly Buddy, respond to a ${age} year old feeling ${mood} in ${lang}. Note: ${notes}`, "Те слушам. Тука сум за тебе!");

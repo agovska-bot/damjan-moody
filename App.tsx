@@ -9,7 +9,6 @@ import LanguageSelector from './components/LanguageSelector';
 import AgeSelector from './components/AgeSelector';
 import * as geminiService from './services/geminiService';
 import { FEATURES as featureTemplates } from './constants';
-import LoadingSpinner from './components/LoadingSpinner';
 import Logo from './components/Logo';
 import PointPopupManager, { PointPopupInfo } from './components/PointPopupManager';
 
@@ -43,18 +42,15 @@ const App: React.FC = () => {
       const savedProgressJSON = localStorage.getItem('moodyBuddyProgress');
       if (savedProgressJSON) {
         const savedProgress: SavedProgress = JSON.parse(savedProgressJSON);
-        
         const parsedMoodHistory = (savedProgress.moodHistory || []).map(log => ({
           ...log,
           timestamp: new Date(log.timestamp),
         }));
-
         setPoints(savedProgress.points || 0);
         setMoodHistory(parsedMoodHistory);
       }
     } catch (error) {
-      console.error("Failed to load progress from localStorage:", error);
-      localStorage.removeItem('moodyBuddyProgress');
+      console.error("Failed to load progress:", error);
     }
   }, []);
 
@@ -79,41 +75,18 @@ const App: React.FC = () => {
     setUiStrings(null);
     setAgeRange(null);
     setAgeSelectorStrings(null);
-    setPrefetchedUiStrings({});
   };
 
   const handleLanguageSelect = useCallback(async (lang: string) => {
     setLanguage(lang);
     setIsFetchingAgeStrings(true);
     setTranslationError(null);
-    setPrefetchedUiStrings({});
-
     try {
       const ageSelectorPromise = geminiService.translateAgeSelectorUI(lang);
-      const ageRanges = ['5-7', '8-12', '13-18', '18+'];
-      const prefetchPromises = ageRanges.map(age => 
-          geminiService.translateUI(lang, age)
-          .then(strings => ({ age, strings }))
-          .catch(e => {
-              console.error(`Prefetching UI for ${age} failed:`, e);
-              return { age, strings: null };
-          })
-      );
-      
       const translatedAgeStrings = await ageSelectorPromise;
       setAgeSelectorStrings(translatedAgeStrings);
-
-      Promise.all(prefetchPromises).then(results => {
-          const prefetched: Record<string, UiStrings | null> = {};
-          results.forEach(result => {
-              prefetched[result.age] = result.strings;
-          });
-          setPrefetchedUiStrings(prefetched);
-      });
-
     } catch (e) {
-      console.error("Age selector translation failed:", e);
-      setTranslationError("Error: Translation unavailable. Try again later.");
+      setTranslationError("Грешка при вчитување. Обидете се повторно.");
       handleLanguageReset();
     } finally {
       setIsFetchingAgeStrings(false);
@@ -123,27 +96,17 @@ const App: React.FC = () => {
   const handleAgeSelect = useCallback(async (age: string) => {
     if (!language) return;
     setAgeRange(age);
-    
-    const prefetched = prefetchedUiStrings[age];
-    if (prefetched) {
-      setUiStrings(prefetched);
-      return;
-    }
-
     setIsTranslating(true);
-    setTranslationError(null);
     try {
       const translatedStrings = await geminiService.translateUI(language, age);
       setUiStrings(translatedStrings);
     } catch (e) {
-      console.error("Translation failed:", e);
-      setTranslationError("Error: Setting up failed. Please try again.");
+      setTranslationError("Грешка при поставување. Обидете се повторно.");
       setLanguage(null);
-      setAgeRange(null);
     } finally {
       setIsTranslating(false);
     }
-  }, [language, prefetchedUiStrings]);
+  }, [language]);
 
   const handleFeatureClick = (feature: Feature) => {
     setIsHiding(true);
@@ -163,20 +126,15 @@ const App: React.FC = () => {
 
   const addPoints = (amount: number) => {
     setPoints(prevPoints => prevPoints + amount);
-
     const newPopup: PointPopupInfo = {
       id: Date.now(),
       amount,
       top: Math.random() * 50 + 20,
       left: Math.random() * 60 + 20,
     };
-
     setPointPopups(currentPopups => [...currentPopups, newPopup]);
-
     setTimeout(() => {
-      setPointPopups(currentPopups =>
-        currentPopups.filter(p => p.id !== newPopup.id)
-      );
+      setPointPopups(currentPopups => currentPopups.filter(p => p.id !== newPopup.id));
     }, 2000);
   };
 
@@ -189,27 +147,6 @@ const App: React.FC = () => {
       timestamp: new Date(),
     };
     setMoodHistory(prevHistory => [newEntry, ...prevHistory]);
-  };
-  
-  const handleSaveProgress = () => {
-    if (!uiStrings) return;
-    try {
-      const progressToSave = {
-        points,
-        moodHistory,
-      };
-      localStorage.setItem('moodyBuddyProgress', JSON.stringify(progressToSave));
-      setSaveButtonText(uiStrings.progressSaved);
-      setTimeout(() => {
-        setSaveButtonText(uiStrings.saveProgress);
-      }, 2000);
-    } catch (error) {
-      console.error("Failed to save progress to localStorage:", error);
-      setSaveButtonText(uiStrings.saveFailed);
-       setTimeout(() => {
-        setSaveButtonText(uiStrings.saveProgress);
-      }, 2000);
-    }
   };
 
   const renderContent = () => {
@@ -224,41 +161,20 @@ const App: React.FC = () => {
     }
   };
 
-  if (!language) {
-    return (
-      <LanguageSelector 
-        onSelect={handleLanguageSelect} 
-        error={translationError}
-      />
-    );
-  }
-
-  if (!uiStrings) {
-    return (
-      <AgeSelector 
-        onSelect={handleAgeSelect} 
-        onBack={handleLanguageReset} 
-        loading={isTranslating} 
-        loadingStrings={isFetchingAgeStrings}
-        uiStrings={ageSelectorStrings}
-      />
-    );
-  }
+  if (!language) return <LanguageSelector onSelect={handleLanguageSelect} error={translationError} />;
+  if (!uiStrings) return <AgeSelector onSelect={handleAgeSelect} onBack={handleLanguageReset} loading={isTranslating} loadingStrings={isFetchingAgeStrings} uiStrings={ageSelectorStrings} />;
 
   return (
     <div className="min-h-screen text-gray-800 flex flex-col items-center p-4 sm:p-6 md:p-8 font-sans overflow-x-hidden">
       <PointPopupManager popups={pointPopups} />
-      <header className="w-full max-w-xl text-center mb-8">
-        <Logo className="h-20 w-20 mx-auto text-gray-800 mb-2" />
-        <h1 className="text-4xl sm:text-5xl font-bold text-gray-800">Moody Buddy 2.0</h1>
-        <p className="text-lg text-gray-600 mt-2">{subtitle}</p>
+      <header className="w-full max-w-xl text-center mb-8 animate-fade-in">
+        <Logo className="h-16 w-16 mx-auto mb-2 text-gray-800" />
+        <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-gray-900">Moody Buddy</h1>
+        <p className="text-md text-gray-500 mt-1 font-medium">{subtitle}</p>
       </header>
       
-      <main className="w-full max-w-sm relative">
-        <div 
-          className={`transition-transform duration-300 ease-in-out ${activeFeature ? 'transform -translate-x-full opacity-0' : 'transform translate-x-0 opacity-100'}`}
-          aria-hidden={!!activeFeature}
-        >
+      <main className="w-full max-w-md relative">
+        <div className={`transition-all duration-300 ${activeFeature ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
           <div className="grid grid-cols-2 gap-4">
             {features.map((feature) => (
               <FeatureButton
@@ -270,31 +186,31 @@ const App: React.FC = () => {
               />
             ))}
           </div>
-          <div className="mt-8 text-center space-y-3">
-            {saveButtonText && (
-              <button
-                onClick={handleSaveProgress}
-                disabled={saveButtonText !== uiStrings.saveProgress}
-                className="w-full max-w-xs mx-auto px-4 py-2 text-sm font-semibold text-white bg-sky-blue-500 rounded-lg hover:bg-sky-blue-600 transition-all focus:outline-none focus:ring-2 focus:ring-sky-blue-400 focus:ring-offset-2 disabled:bg-gray-400"
-              >
-                {saveButtonText}
-              </button>
-            )}
+          <div className="mt-8 flex flex-col items-center gap-3">
+            <button
+              onClick={() => {
+                localStorage.setItem('moodyBuddyProgress', JSON.stringify({ points, moodHistory }));
+                alert(uiStrings.progressSaved);
+              }}
+              className="w-full py-3 bg-white border-2 border-gray-200 text-gray-700 font-bold rounded-2xl hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              {uiStrings.saveProgress}
+            </button>
             <button
               onClick={handleLanguageReset}
-              className="w-full max-w-xs mx-auto px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+              className="text-sm font-bold text-gray-400 hover:text-gray-600 transition-colors"
             >
               {uiStrings.changeLanguageAndAge}
             </button>
+            <p className="text-[10px] text-gray-400 mt-4 uppercase tracking-widest">Powered by firSTep & Gemini</p>
           </div>
         </div>
 
-        <div 
-          className={`absolute top-0 left-0 w-full transition-transform duration-300 ease-in-out ${activeFeature ? 'transform translate-x-0 opacity-100' : 'transform translate-x-full opacity-0'}`}
-          aria-hidden={!activeFeature}
-        >
-          {renderContent()}
-        </div>
+        {activeFeature && (
+          <div className="absolute top-0 left-0 w-full animate-fade-in-up">
+            {renderContent()}
+          </div>
+        )}
       </main>
     </div>
   );

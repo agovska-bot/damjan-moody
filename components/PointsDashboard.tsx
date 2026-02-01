@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Feature, MoodLog, UiStrings } from '../types';
 import BackButton from './BreathingExercise';
@@ -13,7 +12,8 @@ interface PointsDashboardProps {
 
 const PointsDashboard: React.FC<PointsDashboardProps> = ({ feature, goBack, points, moodHistory, uiStrings }) => {
   const buttonFocusRingClass = feature.focusRingClass;
-  const { pointsDashboard: text } = uiStrings;
+  // Fix: The 'pointsDashboard' key was missing in UiStrings; mapping it to 'moodJournal' which contains identical fields.
+  const { moodJournal: text } = uiStrings;
 
   return (
     <div className="flex flex-col p-6 bg-white rounded-lg shadow-lg h-full min-h-[500px] animate-fade-in">
